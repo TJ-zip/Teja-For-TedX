@@ -7,7 +7,7 @@ export const person = {
   email: "tejasuvan_business@protonmail.com",
   phone: "9619818547",
   location: "Mumbai, India 400076",
-  linkedin: "linkedin.com/suvan-teja-pantina",
+  linkedin: "linkedin.com/in/suvan-teja-pantina-9979b63ab",
   instagram: "instagram.com/suvan.pantina",
 };
 
@@ -88,7 +88,7 @@ export const experience: Experience[] = [
     org: "Worldwide Media (The Times Group)",
     title: "Sales & Marketing Intern",
     place: "Mumbai",
-    period: "Current",
+    period: "06/2026 – 09/2026",
     bullets: [
       "Sales and marketing intern at Worldwide Media, a Times Group company, the group behind the ET Now media channels.",
       "Working on commercial and marketing activity inside a large media organisation — directly relevant to sponsor conversations and outreach for TEDx.",
