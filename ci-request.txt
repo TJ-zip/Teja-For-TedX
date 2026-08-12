@@ -1,0 +1,5 @@
+# One npm script name per line. Only names already declared in package.json
+# are accepted; anything else is rejected by the workflow.
+lint
+typecheck
+build
