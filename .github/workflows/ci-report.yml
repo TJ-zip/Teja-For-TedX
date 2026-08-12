@@ -1,0 +1,192 @@
+name: ci-report
+
+# Feedback channel. A run conclusion says THAT something failed, not WHY.
+# This workflow captures full stdout/stderr of each requested script and
+# commits the report (and any generated lockfile) back to the same branch.
+#
+# Security: ci-request.txt SELECTS from script names already declared in
+# package.json. It can never introduce a shell command. Each line is matched
+# against ^[A-Za-z0-9:_-]+$ AND must exist in package.json .scripts.
+
+on:
+  push:
+    paths:
+      - 'ci-request.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-report-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Detect lockfile
+        id: lock
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node (with cache)
+        if: steps.lock.outputs.found == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Node (no lockfile yet)
+        if: steps.lock.outputs.found != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run requested scripts and write report
+        id: run
+        run: |
+          set -uo pipefail
+          mkdir -p ci-reports
+          REPORT=ci-reports/latest.md
+          FAILED=0
+
+          {
+            echo "# CI report"
+            echo
+            echo "- Branch: \`${GITHUB_REF_NAME}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Run: ${GITHUB_RUN_ID}"
+            echo "- Generated: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            echo
+          } > "$REPORT"
+
+          excerpt() {
+            local file="$1"
+            local total
+            total=$(wc -l < "$file")
+            if [ "$total" -le 220 ]; then
+              cat "$file"
+            else
+              head -n 60 "$file"
+              echo
+              echo "... [$((total - 220)) lines omitted] ..."
+              echo
+              tail -n 160 "$file"
+            fi
+          }
+
+          run_script() {
+            local name="$1"
+            local log="/tmp/${name//[^A-Za-z0-9]/_}.log"
+            echo "::group::npm run $name"
+            set +e
+            npm run "$name" > "$log" 2>&1
+            local code=$?
+            set -e
+            cat "$log"
+            echo "::endgroup::"
+            {
+              echo "## \`npm run $name\` — exit $code"
+              echo
+              echo '```'
+              excerpt "$log"
+              echo '```'
+              echo
+            } >> "$REPORT"
+            if [ "$code" -ne 0 ]; then FAILED=1; fi
+          }
+
+          # --- install ---
+          INSTALL_LOG=/tmp/install.log
+          set +e
+          if [ "${{ steps.lock.outputs.found }}" = "true" ]; then
+            INSTALL_CMD="npm ci"
+          else
+            INSTALL_CMD="npm install"
+          fi
+          $INSTALL_CMD > "$INSTALL_LOG" 2>&1
+          INSTALL_CODE=$?
+          set -e
+          cat "$INSTALL_LOG"
+          {
+            echo "## \`$INSTALL_CMD\` — exit $INSTALL_CODE"
+            echo
+            echo '```'
+            excerpt "$INSTALL_LOG"
+            echo '```'
+            echo
+          } >> "$REPORT"
+
+          if [ "$INSTALL_CODE" -ne 0 ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # --- requested scripts ---
+          if [ -f ci-request.txt ]; then
+            while IFS= read -r raw || [ -n "$raw" ]; do
+              line="$(echo "$raw" | tr -d '\r' | xargs || true)"
+              [ -z "$line" ] && continue
+              case "$line" in \#*) continue ;; esac
+
+              if ! echo "$line" | grep -Eq '^[A-Za-z0-9:_-]+$'; then
+                echo "::warning::rejected request line (not a bare script name): $line"
+                {
+                  echo "## rejected: \`$line\`"
+                  echo
+                  echo "Rejected — not a valid script-name token."
+                  echo
+                } >> "$REPORT"
+                continue
+              fi
+
+              if ! node -e "const s=require('./package.json').scripts||{};process.exit(s[process.argv[1]]?0:1)" "$line"; then
+                echo "::warning::rejected request line (script not declared in package.json): $line"
+                {
+                  echo "## rejected: \`$line\`"
+                  echo
+                  echo "Rejected — no such script in package.json."
+                  echo
+                } >> "$REPORT"
+                continue
+              fi
+
+              run_script "$line"
+            done < ci-request.txt
+          else
+            echo "No ci-request.txt found; nothing requested." >> "$REPORT"
+          fi
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit report and lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci-reports/latest.md package-lock.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+          else
+            git commit -m "ci: publish report for ${GITHUB_SHA:0:7} [skip ci]"
+            git push origin HEAD:"${GITHUB_REF_NAME}"
+          fi
+
+      - name: Fail if any script failed
+        if: steps.run.outputs.failed == 'true'
+        run: |
+          echo "::error::One or more steps failed. See ci-reports/latest.md"
+          exit 1

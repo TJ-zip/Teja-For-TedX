@@ -1,0 +1,9 @@
+# One npm script name per line. Only names already declared in package.json
+# are accepted; anything else is rejected by the workflow.
+#
+# Requested for: Next 16 + React 19 + @react-three/fiber 9 upgrade.
+# The lockfile was deleted deliberately so this run regenerates it against the
+# new dependency graph and commits it back.
+lint
+typecheck
+build
