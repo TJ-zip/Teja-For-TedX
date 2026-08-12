@@ -1,15 +1,15 @@
 # CI report
 
-- Branch: `fix/eslint-flat-config`
-- Commit: `6cf8821dc4f2a7a82dc1d1f9fea0395683f0562f`
-- Run: 31567538138
-- Generated: 2026-08-12T05:44:34Z
+- Branch: `main`
+- Commit: `214935ebc6995941cb32eeb0b97dc21825e8090a`
+- Run: 31567643932
+- Generated: 2026-08-12T05:46:24Z
 
 ## `npm ci` — exit 0
 
 ```
 
-added 412 packages, and audited 413 packages in 7s
+added 412 packages, and audited 413 packages in 11s
 
 158 packages are looking for funding
   run `npm fund` for details
@@ -43,7 +43,7 @@ found 0 vulnerabilities
 > next build
 
 ▲ Next.js 16.3.0 (Turbopack)
-✓ Running next.config.mjs took 20ms
+✓ Running next.config.mjs took 22ms
 ⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
 Attention: Next.js now collects completely anonymous telemetry regarding usage.
 This information is used to shape Next.js' roadmap and prioritize features.
@@ -52,7 +52,7 @@ https://nextjs.org/telemetry
 
 
   Creating an optimized production build ...
-✓ Compiled successfully in 5.1s
+✓ Compiled successfully in 5.5s
   Running TypeScript ...
 
   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
@@ -64,10 +64,10 @@ https://nextjs.org/telemetry
 
   	- jsx was set to react-jsx (next.js uses the React automatic runtime)
 
-  Finished TypeScript in 3.2s ...
+  Finished TypeScript in 3.1s ...
   Collecting page data using 3 workers ...
   Generating static pages using 3 workers (0/3) ...
-✓ Generating static pages using 3 workers (3/3) in 167ms
+✓ Generating static pages using 3 workers (3/3) in 177ms
   Finalizing page optimization ...
 
 Route (app)
