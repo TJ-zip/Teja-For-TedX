@@ -38,14 +38,14 @@ jobs:
         if: steps.lock.outputs.found == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Setup Node (no lockfile yet)
         if: steps.lock.outputs.found != 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install
         run: |
