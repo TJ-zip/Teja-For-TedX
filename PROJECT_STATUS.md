@@ -14,29 +14,34 @@ scene each frame. No API routes, no server state, no persistence.
 
 ## Technology stack
 
-Next.js 14.2.15, React 18.3.1, TypeScript 5.6, Tailwind CSS 3.4,
-three 0.169.0, @react-three/fiber 8.17.10. Package manager: npm.
+Next.js 16.3.0, React 19, TypeScript 5.6, Tailwind CSS 3.4,
+three 0.169, @react-three/fiber 9. ESLint 9 flat config using
+eslint-config-next's native flat entry points. Package manager: npm.
 
 ## Working features
 
 - Hero, candidacy statement, four-department mandate, leadership rationale,
   experience, recognition, background, contact sections
 - Scroll-driven camera, star field, core icosahedron, four department pillars
-- Reduced-motion and no-WebGL static fallback
+- Reduced-motion and no-WebGL static fallback (now live-reactive via
+  useSyncExternalStore-backed media queries)
 - Mobile particle/DPR reduction
 - Skip link, visible focus states, aria-hidden decorative canvas
 
 ## Current task
 
-Initial build on `feature/scroll-driven-candidacy-site`; validating via GitHub
-Actions.
+None in progress. Last task: fix the ESLint crash and the react-hooks v7
+violations (branch `fix/eslint-flat-config`, PR #2).
 
 ## Pending tasks
 
+- Merge PR #2 (lint fix) once approved.
 - Add `public/resume.pdf` plus a download button (binary asset could not be
   committed through the available text-only file API).
 - Add a custom OG image.
 - Confirm the WWM internship start date and add it to the experience entry.
+- Optional cleanup: drop the now-unused `@eslint/eslintrc` devDependency
+  (requires lockfile regeneration via CI).
 
 ## Known issues
 
@@ -50,9 +55,10 @@ None.
 
 ## Deployment information
 
-Vercel, Next.js preset, default build command and output directory. Not yet
-imported into a Vercel project - no Vercel tooling was available in the session
-that created this repository, so deployment has not been verified.
+Vercel is connected via the GitHub integration (project `teja-for-ted-x`,
+team `code-lite`). Preview deployments build successfully for branch pushes;
+the `Vercel` commit status and `Vercel Preview Comments` check report success.
+Next.js preset, default build command and output directory.
 
 ## Important architectural decisions
 
@@ -61,7 +67,15 @@ that created this repository, so deployment has not been verified.
   keep the dependency surface and version-conflict risk small.
 - Content centralised in `src/data/content.ts` so copy edits never touch JSX.
 - All content is server-rendered HTML; WebGL is decorative and client-only.
+- Star field uses a seeded mulberry32 PRNG (not Math.random) so render is
+  idempotent, per react-hooks v7 purity rules.
+- ESLint uses eslint-config-next's native flat configs directly; FlatCompat
+  must NOT be reintroduced (it crashes ESLint's legacy validator with
+  "Converting circular structure to JSON").
 
 ## Last completed change
 
-Initial implementation committed to `feature/scroll-driven-candidacy-site`.
+Fixed `npm run lint` on branch `fix/eslint-flat-config` (PR #2): replaced the
+FlatCompat bridge with native flat configs and resolved all 7 react-hooks v7
+errors in `src/components/Scene.tsx`. CI report run 31567538138: npm ci,
+lint, typecheck and build all exit 0. Vercel preview deployment succeeded.
