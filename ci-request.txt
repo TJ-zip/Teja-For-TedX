@@ -1,8 +1,8 @@
 # One npm script name per line. Only names already declared in package.json
 # are accepted; anything else is rejected by the workflow.
 #
-# Requested for: fix/eslint-flat-config — verify the FlatCompat removal fixes
-# the "Converting circular structure to JSON" lint crash.
+# Requested for: fix/eslint-flat-config — verify the Scene.tsx react-hooks
+# purity fixes clear all 7 lint errors, and that typecheck/build still pass.
 lint
 typecheck
 build
