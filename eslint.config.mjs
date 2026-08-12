@@ -1,12 +1,10 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-// Next 16 removed `next lint`, so ESLint is invoked directly. The shared Next
-// configs are still eslintrc-style, so they are bridged in with FlatCompat.
-const compat = new FlatCompat({
-  baseDirectory: dirname(fileURLToPath(import.meta.url)),
-});
+// eslint-config-next 16 ships flat-config-native entry points, so they are
+// imported directly. Do NOT bridge them through @eslint/eslintrc FlatCompat:
+// that routes the already-flat config into ESLint's legacy eslintrc validator,
+// which crashes on the circular plugin references inside the config objects
+// ("Converting circular structure to JSON").
+import coreWebVitals from "eslint-config-next/core-web-vitals";
+import typescript from "eslint-config-next/typescript";
 
 const config = [
   {
@@ -19,7 +17,8 @@ const config = [
       "ci-reports/**",
     ],
   },
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...coreWebVitals,
+  ...typescript,
 ];
 
 export default config;

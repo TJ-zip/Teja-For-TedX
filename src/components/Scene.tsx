@@ -1,7 +1,7 @@
 "use client";
 
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import * as THREE from "three";
 import { useScrollProgress } from "./ScrollProgress";
 
@@ -12,23 +12,38 @@ function damp(current: number, target: number, lambda: number, dt: number) {
   return current + (target - current) * (1 - Math.exp(-lambda * dt));
 }
 
+/**
+ * Deterministic PRNG (mulberry32). The star field must be idempotent across
+ * re-renders, so Math.random() cannot be used during render.
+ */
+function mulberry32(seed: number) {
+  let s = seed | 0;
+  return function next() {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /** Depth field of points the camera travels through as the page scrolls. */
 function StarField({ count }: { count: number }) {
   const points = useRef<THREE.Points>(null);
   const progress = useScrollProgress();
 
   const geometry = useMemo(() => {
+    const rand = mulberry32(0x7ed);
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     for (let i = 0; i < count; i += 1) {
-      const radius = 6 + Math.random() * 26;
-      const theta = Math.random() * Math.PI * 2;
-      const y = (Math.random() - 0.5) * 26;
+      const radius = 6 + rand() * 26;
+      const theta = rand() * Math.PI * 2;
+      const y = (rand() - 0.5) * 26;
       positions[i * 3] = Math.cos(theta) * radius;
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = Math.sin(theta) * radius - 20;
 
-      const tint = Math.random() < 0.22 ? RED : WHITE;
+      const tint = rand() < 0.22 ? RED : WHITE;
       colors[i * 3] = tint.r;
       colors[i * 3 + 1] = tint.g;
       colors[i * 3 + 2] = tint.b;
@@ -147,10 +162,13 @@ function Pillars() {
   );
 }
 
-/** Scroll drives the camera; pointer adds a small parallax. */
+/**
+ * Scroll drives the camera; pointer adds a small parallax.
+ * The camera is read from the frame-loop state (not captured from useThree),
+ * so no hook-returned value is mutated.
+ */
 function CameraRig() {
   const progress = useScrollProgress();
-  const { camera } = useThree();
   const pointer = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -162,7 +180,8 @@ function CameraRig() {
     return () => window.removeEventListener("pointermove", onMove);
   }, []);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    const camera = state.camera;
     const dt = Math.min(delta, 0.1);
     const p = progress.current;
     camera.position.x = damp(camera.position.x, pointer.current.x * 0.6, 3, dt);
@@ -186,17 +205,46 @@ function supportsWebGL() {
   }
 }
 
-export default function Scene() {
-  const [enabled, setEnabled] = useState(false);
-  const [count, setCount] = useState(900);
+/**
+ * Media queries exposed as an external store. This avoids calling setState
+ * synchronously inside an effect and keeps the values live: if the visitor
+ * toggles reduced motion or resizes across the breakpoint, React re-renders.
+ */
+function useMediaQuery(query: string, serverDefault: boolean) {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener("change", onStoreChange);
+      return () => mql.removeEventListener("change", onStoreChange);
+    },
+    [query],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => serverDefault,
+  );
+}
 
-  useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const small = window.matchMedia("(max-width: 768px)").matches;
-    setCount(small ? 420 : 1100);
-    // No WebGL, or the visitor has asked for reduced motion -> stay static.
-    setEnabled(!reduced && supportsWebGL());
-  }, []);
+// WebGL support cannot change during a page's lifetime; probe once and cache
+// so the store snapshot stays referentially stable.
+let webglProbe: boolean | null = null;
+const subscribeNever = () => () => {};
+const getWebGLSnapshot = () => {
+  if (webglProbe === null) webglProbe = supportsWebGL();
+  return webglProbe;
+};
+const getWebGLServerSnapshot = () => false;
+
+export default function Scene() {
+  // Server default "reduced motion: true" -> the server renders the static
+  // fallback, matching the previous behaviour of mounting WebGL client-side.
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)", true);
+  const small = useMediaQuery("(max-width: 768px)", false);
+  const webgl = useSyncExternalStore(subscribeNever, getWebGLSnapshot, getWebGLServerSnapshot);
+
+  const enabled = !reducedMotion && webgl;
+  const count = small ? 420 : 1100;
 
   if (!enabled) {
     return <div aria-hidden="true" className="scene-static" />;
